@@ -108,7 +108,7 @@ const Home = function Home(): JSX.Element {
         })
       }
     }, {
-      // rootMargin: "100px",
+      rootMargin: "100px",
     })
     observerLastTask.current.observe(node)
   }, [filter]);
@@ -165,7 +165,6 @@ const Home = function Home(): JSX.Element {
     if (!value) return;
     const addedTask = value.data.find(task => task.id === id)
     if (!addedTask) throw new Error('Task not found');
-    // saveFavoriteTask(addedTask)
     await handleChangeTaskStatus(id, [addedTask], setValue, "Избранное")
   }
 
