@@ -1,7 +1,7 @@
 import { CSSProperties, JSX, Key } from 'react';
 import { Card, Typography } from "antd";
 import {CheckCircleFilled, CloseCircleFilled, HeartFilled} from "@ant-design/icons";
-import {Statuses, TBaseTaskAttributes} from "../types/task/task.ts";
+import {Statuses, TBaseTaskAttributes} from "./types/task.ts";
 const { Text } = Typography;
 
 type TTask = {

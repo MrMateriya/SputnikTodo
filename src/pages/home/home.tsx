@@ -1,9 +1,9 @@
-import {Container} from "../styles/container.styled.ts";
-import {AddTodoForm} from "../components";
+import {Container} from "../../UI/container/container.styled.ts";
+import {AddTodoForm} from "../../components";
 import {Dispatch, JSX, SetStateAction, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Flex, List, notification, Select, SelectProps, Spin} from "antd";
-import {useFetch} from "../hooks/useFetch.ts";
-import {Task} from "../UI";
+import {useFetch} from "../../hooks/useFetch.ts";
+import {Task} from "../../UI";
 import {produce} from "immer";
 import axios from "axios";
 import {
@@ -13,7 +13,8 @@ import {
   TTaskErrorSchema,
   TTaskPostSchema,
   TTaskResponseSchema
-} from "../types/task/task.ts";
+} from "../../UI/task/types/task.ts";
+import {NotificationInstance} from "antd/es/notification/interface";
 
 type TResponseTasks = {
   data: TTaskResponseSchema[],
@@ -23,6 +24,21 @@ const StatusExtended = { ...Statuses, all: "Все" } as const
 type TExtendedStatuses = typeof StatusExtended[keyof typeof StatusExtended]
 type TOption = { value: TExtendedStatuses, label: TExtendedStatuses }
 const pageSize = 4;
+
+function handleError(e: unknown, api: NotificationInstance) {
+    console.error(e);
+    let errorMessage = 'Something went wrong';
+
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (e && typeof e === 'object' && 'message' in e) {
+      errorMessage = (e as { message: string }).message;
+    }
+    api.warning({
+      message: errorMessage,
+      placement: 'bottomLeft',
+    });
+}
 
 const Home = function Home(): JSX.Element {
   const filterOptions: SelectProps<TStatuses, TOption>['options'] = [
@@ -44,13 +60,15 @@ const Home = function Home(): JSX.Element {
     },
   ]
 
-  const [_, setPageNumber] = useState<number>(1)
-  const { value, loading, error, setValue } = useFetch<TResponseTasks, TTaskErrorSchema>(
-    `${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}`,
-    {},
-    []
-  )
   const [filter, setFilter] = useState<TExtendedStatuses>(StatusExtended.all)
+  const [pageNumber, setPageNumber] = useState<number>(1)
+  const [query, setQuery] = useState<string>(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${pageNumber}&pagination[pageSize]=${pageSize}`)
+
+  const { value, loading, error, setValue } = useFetch<TResponseTasks, TTaskErrorSchema>(
+    query,
+    {},
+    [query]
+  )
   const [api, contextHolder] = notification.useNotification();
 
   const observerLastTask = useRef<IntersectionObserver | null>(null)
@@ -60,15 +78,12 @@ const Home = function Home(): JSX.Element {
     if (observerLastTask.current) observerLastTask.current.disconnect();
     observerLastTask.current = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
-        console.log('isIntersecting task')
-        // console.dir(node.querySelector('.'))
         setPageNumber(prevPage => {
           const nextPage = prevPage + 1
           let query = `${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${nextPage}&pagination[pageSize]=${pageSize}`
           if (filter !== StatusExtended.all) {
             query = `${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${nextPage}&pagination[pageSize]=${pageSize}&filters[status]=${filter}`
           }
-          console.log(query)
           axios.get<TResponseTasks>(query)
             .then(res => {
               if (res.data.data.length === 0) return;
@@ -106,14 +121,6 @@ const Home = function Home(): JSX.Element {
       })
     }
   }, [error])
-  // useEffect(() => {
-  //   if (!value) return;
-  //   value.data.forEach(task => {
-  //     if (task.attributes.status === Statuses.favourite) {
-  //       saveFavoriteTask(task)
-  //     }
-  //   })
-  // }, [value]);
 
   async function handleAddTodo(title: string, description: string) {
     try {
@@ -137,11 +144,7 @@ const Home = function Home(): JSX.Element {
           draft.data.unshift(res.data.data)
       }))
     } catch (e: unknown) {
-      console.error(e)
-      api.warning({
-        message: error?.error?.message || e?.message || 'Something went wrong',
-        placement: 'bottomLeft',
-      })
+      handleError(e, api)
     }
   }
 
@@ -154,11 +157,7 @@ const Home = function Home(): JSX.Element {
         })
       )
     } catch (e) {
-      console.error(e)
-      api.warning({
-        message: error?.error?.message || e?.message || 'Something went wrong',
-        placement: 'bottomLeft',
-      })
+      handleError(e, api)
     }
   }
 
@@ -230,32 +229,18 @@ const Home = function Home(): JSX.Element {
         })
       )
     } catch (e) {
-      console.error(e)
-      api.warning({
-        message: error?.error?.message || e?.message || 'Something went wrong',
-        placement: 'bottomLeft',
-      })
+      handleError(e, api)
     }
   }
-  
-  // function saveFavoriteTask(taskToSave: TTaskResponseSchema) {
-  //   const itemTasks = localStorage.getItem("favorites")
-  //   if (!itemTasks) {
-  //     localStorage.setItem("favorites", JSON.stringify([taskToSave]));
-  //     return;
-  //   }
-  //   const prevSavedFavorites: TTaskResponseSchema[] = JSON.parse(itemTasks);
-  //   // typeguard for tasks
-  //   const repeatTask = prevSavedFavorites.find(task => task.id === taskToSave.id)
-  //   if (repeatTask) {
-  //     localStorage.setItem("favorites", JSON.stringify(prevSavedFavorites.filter(task => task.id !== taskToSave.id)));
-  //   } else {
-  //     localStorage.setItem("favorites", JSON.stringify([...prevSavedFavorites, taskToSave]));
-  //   }
-  //  }
 
   function handleChangeFilters(filter: TExtendedStatuses) {
     setFilter(filter)
+    setPageNumber(1)
+    if (filter !== StatusExtended.all) {
+      setQuery(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}&filters[status]=${filter}`)
+    } else {
+      setQuery(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}`)
+    }
   }
 
   const tasks = useMemo(() => {
@@ -299,7 +284,7 @@ const Home = function Home(): JSX.Element {
               dataSource={tasks?.length !== 0 ? tasks : undefined}
               renderItem={({attributes, id}, index) => {
                 if (!tasks) return;
-                if (tasks.length === index + 1) {
+                if (tasks?.length === index + 1) {
                   return (
                     <List.Item ref={handleInfinityScrolling} key={id}>
                       <Task

@@ -1,6 +1,6 @@
 import { Flex } from "antd";
 import { ScheduleOutlined } from "@ant-design/icons";
-import { Container } from '../styles/container.styled.ts';
+import { Container } from '../container/container.styled.ts';
 import { lime } from '@ant-design/colors';
 import { Typography } from 'antd';
 import styled from "styled-components";
