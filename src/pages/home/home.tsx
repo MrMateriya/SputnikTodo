@@ -5,7 +5,7 @@ import {Flex, List, notification, Select, SelectProps, Spin} from "antd";
 import {useFetch} from "../../hooks/useFetch.ts";
 import {Task, TaskService} from "../../UI";
 import {produce} from "immer";
-import axios from "axios";
+
 import {
   isStatuses,
   Statuses,
@@ -56,41 +56,37 @@ const Home = function Home(): JSX.Element {
   const [api, contextHolder] = notification.useNotification();
   const observerLastTask = useRef<IntersectionObserver | null>(null)
 
-  const handleInfinityScrolling = useCallback(function handleSetLastTask(node: HTMLDivElement | null) {
+  const handleInfinityScrolling = useCallback((node: HTMLDivElement | null) => {
     if (!node) return;
     if (observerLastTask.current) observerLastTask.current.disconnect();
-    observerLastTask.current = new IntersectionObserver((entries) => {
+    observerLastTask.current = new IntersectionObserver(async (entries) => {
       if (entries[0].isIntersecting) {
-        setPageNumber(prevPage => {
-          const nextPage = prevPage + 1
-          let query = `${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${nextPage}&pagination[pageSize]=${pageSize}`
-          if (filter !== StatusesExtended.all) {
-            query = `${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${nextPage}&pagination[pageSize]=${pageSize}&filters[status]=${filter}`
-          }
-          axios.get<TResponseTasks>(query)
-            .then(res => {
-              if (res.data.data.length === 0) return;
-              setValue(produce<TResponseTasks>((draft) => {
-                if (!draft) return;
-                res.data.data.forEach(task => {
-                  draft.data.push(task);
-                })
-              }))
-            })
-            .catch(e => {
-              handleError(e, api)
-            })
-            .finally(() => {
-              observerLastTask.current?.unobserve(node)
-            })
-          return nextPage
-        })
+        try {
+          const nextPage = pageNumber + 1
+          const res = await TaskService.getTasks({
+            params: {
+              "filters[status]": filter === StatusesExtended.all ? null : filter,
+              "pagination[page]": nextPage,
+              "pagination[pageSize]": pageSize,
+            }
+          })
+          if (res.data.data.length === 0) return;
+          setValue(produce<TResponseTasks>((draft) => {
+            if (!draft) return;
+            draft.data.splice(draft.data.length, 0, ...res.data.data)
+          }))
+          setPageNumber(nextPage)
+        } catch (e) {
+          handleError(e, api)
+        } finally {
+          observerLastTask.current?.unobserve(node)
+        }
       }
     }, {
       rootMargin: "100px",
     })
     observerLastTask.current.observe(node)
-  }, [filter]);
+  }, [filter, pageNumber, pageSize]);
 
   useEffect(() => {
     if (error) {
@@ -173,8 +169,8 @@ const Home = function Home(): JSX.Element {
   }
 
   function handleChangeFilters(filter: TExtendedStatuses) {
-    setFilter(filter)
     setPageNumber(1)
+    setFilter(filter)
     if (filter !== StatusesExtended.all) {
       setQuery(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}&filters[status]=${filter}`)
     } else {
@@ -221,7 +217,7 @@ const Home = function Home(): JSX.Element {
               dataSource={tasks?.length !== 0 ? tasks : undefined}
               renderItem={({attributes, id}, index) => {
                 if (!tasks) return;
-                if (tasks?.length === index + 1) {
+                if (tasks.length === index + 1) {
                   return (
                     <List.Item ref={handleInfinityScrolling} key={id}>
                       <Task

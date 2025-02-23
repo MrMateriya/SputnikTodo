@@ -1,5 +1,5 @@
 import {Statuses, TStatuses, TTaskPostSchema, TTaskResponseSchema} from "../types/task.ts";
-import {AxiosResponse} from "axios";
+import {AxiosRequestConfig, AxiosResponse} from "axios";
 import {BackendAxios} from "../../../api/axios/axiosInstance.ts";
 
 type ITaskService = {
@@ -12,34 +12,45 @@ type ITaskService = {
 }
 
 class TaskService implements ITaskService {
-  public create(body: TTaskPostSchema) {
+  public create(body: TTaskPostSchema, params?: AxiosRequestConfig<any>) {
     return BackendAxios.post<{ data: TTaskResponseSchema }>(
       '/tasks',
       JSON.stringify(body),
+      params,
     )
   }
 
-  public delete(id: number) {
-    return BackendAxios.delete<{ data: TTaskResponseSchema }>(`/tasks/${id}`)
+  public delete(id: number, params?: AxiosRequestConfig<any>) {
+    return BackendAxios.delete<{ data: TTaskResponseSchema }>(
+      `/tasks/${id}`,
+      params,
+    )
   }
 
-  public getTaskById(id: number) {
-    return BackendAxios.get<{ data: TTaskResponseSchema }>(`/tasks/${id}`)
+  public getTaskById(id: number, params?: AxiosRequestConfig<any>) {
+    return BackendAxios.get<{ data: TTaskResponseSchema }>(
+      `/tasks/${id}`,
+      params,
+    )
   }
 
-  public getTasks() {
-    return BackendAxios.get<{ data: TTaskResponseSchema[] }>(`/tasks`)
+  public getTasks(params?: AxiosRequestConfig<any>) {
+    return BackendAxios.get<{ data: TTaskResponseSchema[] }>(
+      `/tasks`,
+      params,
+    )
   }
 
-  public put(id: number, body: TTaskPostSchema) {
+  public put(id: number, body: TTaskPostSchema, params?: AxiosRequestConfig<any>) {
     // вынести тип ошибки аксиоса на глольный или локальный для аксиоса
     return BackendAxios.put<{ data: TTaskResponseSchema }>(
       `/tasks/${id}`,
       JSON.stringify(body),
+      params,
     )
   }
 
-  public toggleStatus(id: number, currentStatus: TStatuses, statusToChange: TStatuses) {
+  public toggleStatus(id: number, currentStatus: TStatuses, statusToChange: TStatuses, params?: AxiosRequestConfig<any>) {
     switch (statusToChange) {
       case Statuses.completed:
         if (statusToChange === currentStatus) {
@@ -67,6 +78,7 @@ class TaskService implements ITaskService {
     return BackendAxios.put<{ data: TTaskResponseSchema }>(
       `/tasks/${id}`,
       {data: {status: statusToChange}},
+      params,
     )
   }
 }

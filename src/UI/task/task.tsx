@@ -8,6 +8,7 @@ type TTask = {
   style?: CSSProperties,
   key?: Key | null | undefined
   id: number,
+  loading?: boolean,
   onDoneTask?: (id: number, attributes: TBaseTaskAttributes) => void,
   onDeleteTask?: (id: number, attributes: TBaseTaskAttributes) => void,
   onAddToFavoriteTask?: (id: number, attributes: TBaseTaskAttributes) => void,
@@ -16,6 +17,7 @@ type TTask = {
 
 const Task = ({
                 style,
+                loading,
                 key,
                 id,
                 onDoneTask,
@@ -62,9 +64,9 @@ const Task = ({
       key={key}
       style={style}
       actions={[
-        <CheckCircleFilled style={{width: "fit-content"}} onClick={handleDoneTask}/>,
-        <CloseCircleFilled style={{width: "fit-content"}} onClick={handleDeleteTask}/>,
-        <HeartFilled style={{width: "fit-content"}} onClick={handleAddToFavoriteTask}/>,
+        <CheckCircleFilled disabled={loading} style={{width: "fit-content"}} onClick={handleDoneTask}/>,
+        <CloseCircleFilled disabled={loading} style={{width: "fit-content"}} onClick={handleDeleteTask}/>,
+        <HeartFilled disabled={loading} style={{width: "fit-content"}} onClick={handleAddToFavoriteTask}/>,
       ]}
     >
         {description}

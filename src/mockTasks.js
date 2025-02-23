@@ -53,17 +53,20 @@ const tasks = {
     },
   ]
 }
-for (let i = 0; i < tasks.data.length; i++) {
-  fetch(`https://cms.laurence.host/api/tasks`, {
-    body: JSON.stringify({
-      data: tasks.data[i],
-    }),
-    headers: {
-      "Content-Type": "application/json",
-    },
-    method: "POST"
-  })
-    .then(res => res.json())
-    .then(_ => console.log(_))
-    .catch(err => console.log(err))
+const times = 20;
+for (let i = 0; i < times; i++) {
+  for (let i = 0; i < tasks.data.length; i++) {
+    fetch(`https://cms.laurence.host/api/tasks`, {
+      body: JSON.stringify({
+        data: tasks.data[i],
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST"
+    })
+      .then(res => res.json())
+      .then(_ => console.log(_))
+      .catch(err => console.log(err))
+  }
 }
