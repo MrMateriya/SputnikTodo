@@ -1,9 +1,9 @@
-import {Container} from "../../UI/container/container.styled.ts";
+import {Container} from "../../UI";
 import {AddTodoForm} from "../../components";
 import {Dispatch, JSX, SetStateAction, useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {Flex, List, notification, Select, SelectProps, Spin} from "antd";
 import {useFetch} from "../../hooks/useFetch.ts";
-import {Task} from "../../UI";
+import {Task, TaskService} from "../../UI";
 import {produce} from "immer";
 import axios from "axios";
 import {
@@ -14,31 +14,15 @@ import {
   TTaskPostSchema,
   TTaskResponseSchema
 } from "../../UI/task/types/task.ts";
-import {NotificationInstance} from "antd/es/notification/interface";
+import {handleError} from "../../utils/handleError.ts";
 
 type TResponseTasks = {
   data: TTaskResponseSchema[],
 }
-
-const StatusExtended = { ...Statuses, all: "Все" } as const
-type TExtendedStatuses = typeof StatusExtended[keyof typeof StatusExtended]
+const StatusesExtended = { ...Statuses, all: "Все" } as const
+type TExtendedStatuses = typeof StatusesExtended[keyof typeof StatusesExtended]
 type TOption = { value: TExtendedStatuses, label: TExtendedStatuses }
 const pageSize = 4;
-
-function handleError(e: unknown, api: NotificationInstance) {
-    console.error(e);
-    let errorMessage = 'Something went wrong';
-
-    if (e instanceof Error) {
-      errorMessage = e.message;
-    } else if (e && typeof e === 'object' && 'message' in e) {
-      errorMessage = (e as { message: string }).message;
-    }
-    api.warning({
-      message: errorMessage,
-      placement: 'bottomLeft',
-    });
-}
 
 const Home = function Home(): JSX.Element {
   const filterOptions: SelectProps<TStatuses, TOption>['options'] = [
@@ -60,7 +44,7 @@ const Home = function Home(): JSX.Element {
     },
   ]
 
-  const [filter, setFilter] = useState<TExtendedStatuses>(StatusExtended.all)
+  const [filter, setFilter] = useState<TExtendedStatuses>(StatusesExtended.all)
   const [pageNumber, setPageNumber] = useState<number>(1)
   const [query, setQuery] = useState<string>(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${pageNumber}&pagination[pageSize]=${pageSize}`)
 
@@ -70,7 +54,6 @@ const Home = function Home(): JSX.Element {
     [query]
   )
   const [api, contextHolder] = notification.useNotification();
-
   const observerLastTask = useRef<IntersectionObserver | null>(null)
 
   const handleInfinityScrolling = useCallback(function handleSetLastTask(node: HTMLDivElement | null) {
@@ -81,7 +64,7 @@ const Home = function Home(): JSX.Element {
         setPageNumber(prevPage => {
           const nextPage = prevPage + 1
           let query = `${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${nextPage}&pagination[pageSize]=${pageSize}`
-          if (filter !== StatusExtended.all) {
+          if (filter !== StatusesExtended.all) {
             query = `${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${nextPage}&pagination[pageSize]=${pageSize}&filters[status]=${filter}`
           }
           axios.get<TResponseTasks>(query)
@@ -95,11 +78,7 @@ const Home = function Home(): JSX.Element {
               }))
             })
             .catch(e => {
-              console.error(e)
-              api.warning({
-                message: error?.error?.message || e?.message || 'Something went wrong',
-                placement: 'bottomLeft',
-              })
+              handleError(e, api)
             })
             .finally(() => {
               observerLastTask.current?.unobserve(node)
@@ -115,10 +94,7 @@ const Home = function Home(): JSX.Element {
 
   useEffect(() => {
     if (error) {
-      api.warning({
-        message: error?.error?.message || 'Something went wrong',
-        placement: 'bottomLeft',
-      })
+      handleError(error.error?.message, api)
     }
   }, [error])
 
@@ -128,18 +104,10 @@ const Home = function Home(): JSX.Element {
         data: {
           title,
           description,
-          status: "Не выполнена",
+          status: StatusesExtended.notCompleted,
         }
       }
-      const res = await axios.post<{ data: TTaskResponseSchema}>(
-        `${import.meta.env.VITE_API_URL}/tasks`,
-        JSON.stringify(body),
-        {
-          headers: {
-            "Content-Type": "application/json",
-          }
-        },
-      )
+      const res = await TaskService.create(body)
       setValue(produce<TResponseTasks>((draft) => {
           draft.data.unshift(res.data.data)
       }))
@@ -150,7 +118,7 @@ const Home = function Home(): JSX.Element {
 
   async function handleDeleteTask(id: number) {
     try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/tasks/${id}`)
+      await TaskService.delete(id)
       setValue(
         produce<TResponseTasks>((draft) => {
           draft.data = draft.data.filter(task => task.id !== id);
@@ -173,46 +141,18 @@ const Home = function Home(): JSX.Element {
     await handleChangeTaskStatus(id, value.data, setValue, "Выполнена")
   }
 
-  async function handleChangeTaskStatus(id: number, tasks: TTaskResponseSchema[], setTasks: Dispatch<SetStateAction<TResponseTasks | undefined>>, statusToChange: TStatuses) {
+  async function handleChangeTaskStatus(id: number,
+                                        tasks: TTaskResponseSchema[],
+                                        setTasks: Dispatch<SetStateAction<TResponseTasks | undefined>>,
+                                        statusToChange: TStatuses) {
     try {
-      if (!isStatuses(statusToChange)) throw new Error('Status not found');
       const task = tasks.find(task => task.id === id)
       if (!task) throw new Error('Task not found');
-      const { attributes: { title, status, description } } = task
+      let { attributes: { status } } = task
 
-      let currentStatus = statusToChange;
+      if (!isStatuses(statusToChange) || !isStatuses(status)) throw new Error('Status not found');
 
-      switch (statusToChange) {
-        case Statuses.completed:
-          if (statusToChange === status) {
-            currentStatus = Statuses.notCompleted
-            break;
-          }
-          currentStatus = Statuses.completed
-          break;
-        case Statuses.notCompleted:
-          if (statusToChange === status) {
-            currentStatus = Statuses.completed
-            break;
-          }
-          currentStatus = Statuses.notCompleted
-          break;
-        case Statuses.favourite:
-          if (statusToChange === status) {
-            currentStatus = Statuses.notCompleted
-            break;
-          }
-          currentStatus = Statuses.favourite
-          break;
-      }
-
-      await axios.put<TTaskPostSchema>(`${import.meta.env.VITE_API_URL}/tasks/${id}`, {
-        data: {
-          status: currentStatus,
-          title,
-          description,
-        }
-      })
+      const res = await TaskService.toggleStatus(id, status, statusToChange)
 
       setTasks(
         produce<TResponseTasks>((draft) => {
@@ -224,7 +164,7 @@ const Home = function Home(): JSX.Element {
             }
           })
           if (!task) throw new Error('Task not found');
-          draft.data[taskIndex].attributes.status = currentStatus;
+          draft.data[taskIndex].attributes.status = res.data.data.attributes.status;
         })
       )
     } catch (e) {
@@ -235,7 +175,7 @@ const Home = function Home(): JSX.Element {
   function handleChangeFilters(filter: TExtendedStatuses) {
     setFilter(filter)
     setPageNumber(1)
-    if (filter !== StatusExtended.all) {
+    if (filter !== StatusesExtended.all) {
       setQuery(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}&filters[status]=${filter}`)
     } else {
       setQuery(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}`)
@@ -244,15 +184,13 @@ const Home = function Home(): JSX.Element {
 
   const tasks = useMemo(() => {
     if (!value) return;
-    if (filter === StatusExtended.all) return value.data;
+    if (filter === StatusesExtended.all) return value.data;
     return value.data.filter(task => task.attributes.status === filter)
   }, [filter, value])
 
   return (
     <main>
-      {
-        contextHolder
-      }
+      {contextHolder}
       <Container>
         <AddTodoForm
           style={{
