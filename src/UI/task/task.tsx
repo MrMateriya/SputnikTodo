@@ -1,5 +1,5 @@
-import { CSSProperties, JSX, Key } from 'react';
-import { Card, Typography } from "antd";
+import {CSSProperties, JSX, Key, Ref} from 'react';
+import {Button, Card, Typography} from "antd";
 import {CheckCircleFilled, CloseCircleFilled, HeartFilled} from "@ant-design/icons";
 import {Statuses, TBaseTaskAttributes} from "./types/task.ts";
 const { Text } = Typography;
@@ -8,7 +8,8 @@ type TTask = {
   style?: CSSProperties,
   key?: Key | null | undefined
   id: number,
-  loading?: boolean,
+  rootRef?: Ref<HTMLDivElement>,
+  disabled?: boolean,
   onDoneTask?: (id: number, attributes: TBaseTaskAttributes) => void,
   onDeleteTask?: (id: number, attributes: TBaseTaskAttributes) => void,
   onAddToFavoriteTask?: (id: number, attributes: TBaseTaskAttributes) => void,
@@ -17,7 +18,8 @@ type TTask = {
 
 const Task = ({
                 style,
-                loading,
+                rootRef,
+                disabled,
                 key,
                 id,
                 onDoneTask,
@@ -54,6 +56,8 @@ const Task = ({
 
   return (
     <Card
+      id={String(id)}
+      ref={rootRef}
       styles={{
         body: {
           overflow: "hidden",
@@ -64,9 +68,15 @@ const Task = ({
       key={key}
       style={style}
       actions={[
-        <CheckCircleFilled disabled={loading} style={{width: "fit-content"}} onClick={handleDoneTask}/>,
-        <CloseCircleFilled disabled={loading} style={{width: "fit-content"}} onClick={handleDeleteTask}/>,
-        <HeartFilled disabled={loading} style={{width: "fit-content"}} onClick={handleAddToFavoriteTask}/>,
+        <Button disabled={disabled} onClick={handleDoneTask}>
+          <CheckCircleFilled style={{width: "fit-content"}}/>
+        </Button>,
+        <Button disabled={disabled} onClick={handleDeleteTask}>
+          <CloseCircleFilled style={{width: "fit-content"}}/>
+        </Button>,
+        <Button disabled={disabled} onClick={handleAddToFavoriteTask}>
+          <HeartFilled style={{width: "fit-content"}}/>
+        </Button>,
       ]}
     >
         {description}

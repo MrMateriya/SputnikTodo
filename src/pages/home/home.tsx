@@ -15,6 +15,7 @@ import {
   TTaskResponseSchema
 } from "../../UI/task/types/task.ts";
 import {handleError} from "../../utils/handleError.ts";
+import {AxiosResponse} from "axios";
 
 type TResponseTasks = {
   data: TTaskResponseSchema[],
@@ -23,6 +24,27 @@ const StatusesExtended = { ...Statuses, all: "Все" } as const
 type TExtendedStatuses = typeof StatusesExtended[keyof typeof StatusesExtended]
 type TOption = { value: TExtendedStatuses, label: TExtendedStatuses }
 const pageSize = 4;
+
+function getNumericParam(query: URL, paramToFind: string) {
+  const param = query.searchParams.get(paramToFind)
+  if (!param) throw new Error('param not found in query')
+  if (isNaN(Number(param))) throw new Error('param number is NaN')
+  return Number(param)
+}
+async function handleAsyncAction<T, S>(callback: (...args: unknown[]) => Promise<T>,
+                                       setLoading: Dispatch<SetStateAction<S>>,
+                                       startLoadingCallback: SetStateAction<S>,
+                                       endLoadingCallback: SetStateAction<S>,
+                                       ) {
+  try {
+    setLoading(startLoadingCallback)
+    return await callback()
+  } catch (e: unknown) {
+    if (e instanceof Error) throw e
+  } finally {
+    setLoading(endLoadingCallback)
+  }
+}
 
 const Home = function Home(): JSX.Element {
   const filterOptions: SelectProps<TStatuses, TOption>['options'] = [
@@ -44,17 +66,16 @@ const Home = function Home(): JSX.Element {
     },
   ]
 
-  const [filter, setFilter] = useState<TExtendedStatuses>(StatusesExtended.all)
-  const [pageNumber, setPageNumber] = useState<number>(1)
-  const [query, setQuery] = useState<string>(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=${pageNumber}&pagination[pageSize]=${pageSize}`)
-
+  const [query, setQuery] = useState<URL>(new URL(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=4`))
+  const [addTaskLoading, setAddTaskLoading] = useState<boolean>(false)
   const { value, loading, error, setValue } = useFetch<TResponseTasks, TTaskErrorSchema>(
-    query,
+    query.href,
     {},
-    [query]
+    []
   )
   const [api, contextHolder] = notification.useNotification();
   const observerLastTask = useRef<IntersectionObserver | null>(null)
+  const [taskIdActioning, setTaskIdActioning] = useState<number[]>([])
 
   const handleInfinityScrolling = useCallback((node: HTMLDivElement | null) => {
     if (!node) return;
@@ -62,10 +83,11 @@ const Home = function Home(): JSX.Element {
     observerLastTask.current = new IntersectionObserver(async (entries) => {
       if (entries[0].isIntersecting) {
         try {
-          const nextPage = pageNumber + 1
+          const nextPage = getNumericParam(query, "pagination[page]") + 1
+          const filter = query.searchParams.get("filters[status]")
           const res = await TaskService.getTasks({
             params: {
-              "filters[status]": filter === StatusesExtended.all ? null : filter,
+              "filters[status]": filter,
               "pagination[page]": nextPage,
               "pagination[pageSize]": pageSize,
             }
@@ -75,7 +97,11 @@ const Home = function Home(): JSX.Element {
             if (!draft) return;
             draft.data.splice(draft.data.length, 0, ...res.data.data)
           }))
-          setPageNumber(nextPage)
+          setQuery(prevUrl => {
+            const newUrl = new URL(prevUrl)
+            newUrl.searchParams.set("pagination[page]", String(nextPage))
+            return newUrl;
+          })
         } catch (e) {
           handleError(e, api)
         } finally {
@@ -86,7 +112,7 @@ const Home = function Home(): JSX.Element {
       rootMargin: "100px",
     })
     observerLastTask.current.observe(node)
-  }, [filter, pageNumber, pageSize]);
+  }, [query, pageSize]);
 
   useEffect(() => {
     if (error) {
@@ -103,7 +129,13 @@ const Home = function Home(): JSX.Element {
           status: StatusesExtended.notCompleted,
         }
       }
-      const res = await TaskService.create(body)
+      const res = await handleAsyncAction<AxiosResponse<{data: TTaskResponseSchema}>, boolean>(
+        () => TaskService.create(body),
+        setAddTaskLoading,
+        _ => true,
+        _ => false,
+      )
+      if (!res) throw new Error("Failed add task")
       setValue(produce<TResponseTasks>((draft) => {
           draft.data.unshift(res.data.data)
       }))
@@ -114,12 +146,16 @@ const Home = function Home(): JSX.Element {
 
   async function handleDeleteTask(id: number) {
     try {
-      await TaskService.delete(id)
-      setValue(
-        produce<TResponseTasks>((draft) => {
-          draft.data = draft.data.filter(task => task.id !== id);
-        })
+      await handleAsyncAction<AxiosResponse<{data: TTaskResponseSchema}>, number[]>(
+        () => TaskService.delete(id),
+        setTaskIdActioning,
+        ids => [...ids, id],
+        ids => [...ids].filter(currentId => currentId !== id),
       )
+      setValue(produce<TResponseTasks>((draft) => {
+        if (!draft) return
+        draft.data = draft.data.filter(task => task.id !== id);
+      }))
     } catch (e) {
       handleError(e, api)
     }
@@ -148,10 +184,14 @@ const Home = function Home(): JSX.Element {
 
       if (!isStatuses(statusToChange) || !isStatuses(status)) throw new Error('Status not found');
 
-      const res = await TaskService.toggleStatus(id, status, statusToChange)
-
-      setTasks(
-        produce<TResponseTasks>((draft) => {
+      const res = await handleAsyncAction<AxiosResponse<{data: TTaskResponseSchema}>, number[]>(
+        () => TaskService.toggleStatus(id, status, statusToChange),
+        setTaskIdActioning,
+        ids => [...ids, id],
+        ids => [...ids].filter(currentId => currentId !== id),
+      )
+      if (!res) throw new Error('Failed change status');
+      setTasks(produce<TResponseTasks>((draft) => {
           let taskIndex = 0;
           const task = draft.data.find((task, index) => {
             if (task.id === id) {
@@ -161,28 +201,32 @@ const Home = function Home(): JSX.Element {
           })
           if (!task) throw new Error('Task not found');
           draft.data[taskIndex].attributes.status = res.data.data.attributes.status;
-        })
-      )
+        }))
     } catch (e) {
       handleError(e, api)
     }
   }
 
   function handleChangeFilters(filter: TExtendedStatuses) {
-    setPageNumber(1)
-    setFilter(filter)
-    if (filter !== StatusesExtended.all) {
-      setQuery(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}&filters[status]=${filter}`)
-    } else {
-      setQuery(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=${pageSize}`)
-    }
+    setQuery(prevUrl => {
+      const newUrl = new URL(prevUrl)
+      newUrl.searchParams.set("pagination[page]", String(1))
+      if (filter === StatusesExtended.all) {
+        newUrl.searchParams.delete("filters[status]")
+        return newUrl;
+      }
+      newUrl.searchParams.set("filters[status]", filter)
+      return  newUrl
+    })
   }
 
   const tasks = useMemo(() => {
     if (!value) return;
-    if (filter === StatusesExtended.all) return value.data;
+    const filter = query.searchParams.get("filters[status]")
+    if (!filter) return value.data;
+    if (!isStatuses(filter)) throw new Error('param is not a status')
     return value.data.filter(task => task.attributes.status === filter)
-  }, [filter, value])
+  }, [query, value])
 
   return (
     <main>
@@ -194,7 +238,7 @@ const Home = function Home(): JSX.Element {
                 marginTop: 20,
               }
           }}
-          loading={loading}
+          disabled={loading || addTaskLoading}
           onSubmit={handleAddTodo}
         />
         <Select<TExtendedStatuses, TOption>
@@ -221,6 +265,7 @@ const Home = function Home(): JSX.Element {
                   return (
                     <List.Item ref={handleInfinityScrolling} key={id}>
                       <Task
+                        disabled={taskIdActioning.includes(id)}
                         onDeleteTask={handleDeleteTask}
                         onAddToFavoriteTask={handleAddToFavoriteTask}
                         onDoneTask={handleDoneTask}
@@ -233,6 +278,7 @@ const Home = function Home(): JSX.Element {
                 return (
                   <List.Item key={id}>
                     <Task
+                      disabled={taskIdActioning.includes(id)}
                       onDeleteTask={handleDeleteTask}
                       onAddToFavoriteTask={handleAddToFavoriteTask}
                       onDoneTask={handleDoneTask}

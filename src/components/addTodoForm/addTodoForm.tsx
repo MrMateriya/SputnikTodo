@@ -6,7 +6,7 @@ type TAddTodoFormProps = {
   style?: {
     form?: CSSProperties,
   }
-  loading?: boolean,
+  disabled?: boolean,
 };
 type TFieldTypes = {
   title: string,
@@ -14,7 +14,7 @@ type TFieldTypes = {
 }
 
 const AddTodoForm = function AddTodoForm({
-                                           onSubmit, style, loading,
+                                           onSubmit, style, disabled,
 }: TAddTodoFormProps): JSX.Element {
   const handleSubmit: FormProps<TFieldTypes>['onFinish'] = ({title, description}) => {
     if (onSubmit) onSubmit(title, description)
@@ -22,7 +22,7 @@ const AddTodoForm = function AddTodoForm({
 
   return (
     <Form
-      disabled={loading}
+      disabled={disabled}
       style={style?.form}
       autoComplete="off"
       onFinish={handleSubmit}>
