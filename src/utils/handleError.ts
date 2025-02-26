@@ -1,7 +1,6 @@
 import {NotificationInstance} from "antd/es/notification/interface";
 
 function handleError(e: unknown, api: NotificationInstance) {
-  console.error(e);
   let errorMessage = 'Something went wrong';
 
   if (e instanceof Error) {
@@ -10,6 +9,7 @@ function handleError(e: unknown, api: NotificationInstance) {
     errorMessage = (e as { message: string }).message;
   }
 
+  console.error(errorMessage);
   api.warning({
     message: errorMessage,
     placement: 'bottomLeft',

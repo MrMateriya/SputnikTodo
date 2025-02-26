@@ -24,6 +24,13 @@ type TTaskResponseSchema = {
   attributes: TTaskAttributes,
 }
 
+type TResponseTasks = {
+  data: TTaskResponseSchema[],
+}
+type TResponseTask = {
+  data: TTaskResponseSchema,
+}
+
 type TTaskPostSchema = {
   data: Partial<TBaseTaskAttributes>,
 }
@@ -48,6 +55,8 @@ export type {
   TStatuses,
   TTaskAttributes,
   TTaskResponseSchema,
+  TResponseTask,
+  TResponseTasks,
   TBaseTaskAttributes,
   TTaskPostSchema,
   TTaskErrorSchema,

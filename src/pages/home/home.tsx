@@ -9,6 +9,7 @@ import {produce} from "immer";
 import {
   isStatuses,
   Statuses,
+  TResponseTasks,
   TStatuses,
   TTaskErrorSchema,
   TTaskPostSchema,
@@ -16,10 +17,8 @@ import {
 } from "../../UI/task/types/task.ts";
 import {handleError} from "../../utils/handleError.ts";
 import {AxiosResponse} from "axios";
+import * as timers from "node:timers";
 
-type TResponseTasks = {
-  data: TTaskResponseSchema[],
-}
 const StatusesExtended = { ...Statuses, all: "Все" } as const
 type TExtendedStatuses = typeof StatusesExtended[keyof typeof StatusesExtended]
 type TOption = { value: TExtendedStatuses, label: TExtendedStatuses }
@@ -68,10 +67,11 @@ const Home = function Home(): JSX.Element {
 
   const [query, setQuery] = useState<URL>(new URL(`${import.meta.env.VITE_API_URL}/tasks?pagination[page]=1&pagination[pageSize]=4`))
   const [addTaskLoading, setAddTaskLoading] = useState<boolean>(false)
+  const [retryCounter, setRetryCounter] = useState<number>(0)
   const { value, loading, error, setValue } = useFetch<TResponseTasks, TTaskErrorSchema>(
     query.href,
     {},
-    []
+    [retryCounter]
   )
   const [api, contextHolder] = notification.useNotification();
   const observerLastTask = useRef<IntersectionObserver | null>(null)
@@ -104,6 +104,10 @@ const Home = function Home(): JSX.Element {
           })
         } catch (e) {
           handleError(e, api)
+          setTimeout(() => {
+            console.log('timer start')
+            handleInfinityScrolling(node)
+          }, 5000)
         } finally {
           observerLastTask.current?.unobserve(node)
         }
@@ -115,8 +119,18 @@ const Home = function Home(): JSX.Element {
   }, [query, pageSize]);
 
   useEffect(() => {
+    let timer: NodeJS.Timeout | null = null
     if (error) {
+      timer = setTimeout(() => {
+        console.log('timer start')
+        setRetryCounter(p => p + 1)
+      }, 5000)
       handleError(error.error?.message, api)
+    }
+
+    return () => {
+      if (!timer) return;
+      clearTimeout(timer)
     }
   }, [error])
 
@@ -180,7 +194,7 @@ const Home = function Home(): JSX.Element {
     try {
       const task = tasks.find(task => task.id === id)
       if (!task) throw new Error('Task not found');
-      let { attributes: { status } } = task
+      const { attributes: { status } } = task
 
       if (!isStatuses(statusToChange) || !isStatuses(status)) throw new Error('Status not found');
 
