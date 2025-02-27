@@ -1,7 +1,7 @@
 import {Container} from "../../UI";
 import {AddTodoForm} from "../../components";
 import {CSSProperties, Dispatch, JSX, SetStateAction, useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Flex, List, notification, Select, SelectProps, Spin} from "antd";
+import {Flex, List, notification, Select, SelectProps, Spin, Typography} from "antd";
 import {useFetch} from "../../hooks/useFetch.ts";
 import {Task, TaskService} from "../../UI";
 import {produce} from "immer";
@@ -16,6 +16,7 @@ import {
 } from "../../UI/task/types/task.ts";
 import {handleError} from "../../utils/handleError.ts";
 import {AxiosResponse} from "axios";
+const { Text } = Typography;
 
 const StatusesExtended = { ...Statuses, all: "Все" } as const
 type TExtendedStatuses = typeof StatusesExtended[keyof typeof StatusesExtended]
@@ -287,6 +288,9 @@ const Home = function Home(): JSX.Element {
                 <Spin size="large"/>
               </Flex>
             : <List
+              header={tasks
+                ? <Text keyboard>Количество задач: {tasks.length}</Text>
+                : null}
               itemLayout="vertical"
               dataSource={tasks?.length !== 0 ? tasks : undefined}
               renderItem={renderItem}
