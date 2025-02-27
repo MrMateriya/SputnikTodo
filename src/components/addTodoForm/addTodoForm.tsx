@@ -1,4 +1,4 @@
-import {CSSProperties, JSX} from 'react';
+import {CSSProperties, JSX, memo} from 'react';
 import {Button, Form, FormProps, Input} from "antd";
 
 type TAddTodoFormProps = {
@@ -13,8 +13,10 @@ type TFieldTypes = {
   description: string,
 }
 
-const AddTodoForm = function AddTodoForm({
-                                           onSubmit, style, disabled,
+const AddTodoForm = memo(function AddTodoForm({
+                                          onSubmit,
+                                          style,
+                                          disabled,
 }: TAddTodoFormProps): JSX.Element {
   const handleSubmit: FormProps<TFieldTypes>['onFinish'] = ({title, description}) => {
     if (onSubmit) onSubmit(title, description)
@@ -55,6 +57,6 @@ const AddTodoForm = function AddTodoForm({
       </Form.Item>
     </Form>
   );
-}
+})
 
 export default AddTodoForm;

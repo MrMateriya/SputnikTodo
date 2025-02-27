@@ -53,7 +53,7 @@ const tasks = {
     },
   ]
 }
-const times = 20;
+const times = 1;
 for (let i = 0; i < times; i++) {
   for (let i = 0; i < tasks.data.length; i++) {
     fetch(`https://cms.laurence.host/api/tasks`, {

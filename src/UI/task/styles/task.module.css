@@ -1,0 +1,10 @@
+.task-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    & > li {
+        & > span {
+            cursor: auto !important;
+        }
+    }
+}

@@ -1,8 +1,9 @@
-import {CSSProperties, JSX, Key, Ref} from 'react';
+import {CSSProperties, JSX, Key, memo, Ref} from 'react';
 import {Button, Card, Typography} from "antd";
 import {CheckCircleFilled, CloseCircleFilled, HeartFilled} from "@ant-design/icons";
 import {Statuses, TBaseTaskAttributes} from "./types/task.ts";
-const { Text } = Typography;
+const {Text} = Typography;
+import styles from './styles/task.module.css';
 
 type TTask = {
   style?: CSSProperties,
@@ -16,7 +17,7 @@ type TTask = {
   attributes: TBaseTaskAttributes,
 }
 
-const Task = ({
+const Task = memo(({
                 style,
                 rootRef,
                 disabled,
@@ -61,7 +62,14 @@ const Task = ({
       styles={{
         body: {
           overflow: "hidden",
-        }
+        },
+        title: {
+          whiteSpace: "wrap",
+          padding: "10px 0"
+        },
+      }}
+      classNames={{
+        actions: styles["task-actions"],
       }}
       title={title}
       extra={statusTitle}
@@ -82,6 +90,6 @@ const Task = ({
         {description}
     </Card>
   );
-};
+});
 
 export default Task;
